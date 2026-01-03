@@ -1,0 +1,95 @@
+%% Advanced Retail Sales Forecasting - MATLAB
+clc; clear; close all;
+
+%% --- Step 1: Load Dataset ---
+load('sales_data.mat');  % Month and Sales should be in the .mat file
+
+numMonths = length(Sales);
+fprintf('Loaded sales data for %d months.\n', numMonths);
+
+%% --- Step 2: Plot Historical Sales ---
+figure('Name','Historical Sales','NumberTitle','off');
+bar(Sales, 0.6, 'FaceColor',[0.2 0.6 0.8]);
+set(gca, 'XTick',1:numMonths,'XTickLabel',Month);
+ylabel('Sales ($1000)');
+title('Historical Monthly Sales');
+grid on;
+
+%% --- Step 3: Moving Average Forecast (3-month) ---
+window = 3;
+mov_avg = movmean(Sales, window);
+
+figure('Name','Moving Average Forecast','NumberTitle','off');
+plot(1:numMonths, Sales, '-o','LineWidth',2); hold on;
+plot(1:numMonths, mov_avg, '-s','LineWidth',2);
+set(gca,'XTick',1:numMonths,'XTickLabel',Month);
+xlabel('Month'); ylabel('Sales ($1000)');
+title(sprintf('%d-Month Moving Average', window));
+legend('Actual Sales','Moving Average','Location','best');
+grid on;
+
+%% --- Step 4: Exponential Smoothing Forecast ---
+alpha = 0.3;  % smoothing factor
+exp_smooth = zeros(size(Sales));
+exp_smooth(1) = Sales(1);
+for t=2:numMonths
+    exp_smooth(t) = alpha*Sales(t) + (1-alpha)*exp_smooth(t-1);
+end
+
+figure('Name','Exponential Smoothing Forecast','NumberTitle','off');
+plot(1:numMonths, Sales, '-o','LineWidth',2); hold on;
+plot(1:numMonths, exp_smooth, '-s','LineWidth',2);
+set(gca,'XTick',1:numMonths,'XTickLabel',Month);
+xlabel('Month'); ylabel('Sales ($1000)');
+title('Exponential Smoothing Forecast');
+legend('Actual Sales','Exp. Smoothed','Location','best');
+grid on;
+
+%% --- Step 5: Trend Analysis using Linear Regression ---
+x = (1:numMonths)'; % time
+y = Sales';
+mdl = fitlm(x,y);
+trend = mdl.Fitted;
+
+figure('Name','Linear Regression Trend','NumberTitle','off');
+plot(1:numMonths, Sales, '-o','LineWidth',2); hold on;
+plot(1:numMonths, trend, '-r','LineWidth',2);
+set(gca,'XTick',1:numMonths,'XTickLabel',Month);
+xlabel('Month'); ylabel('Sales ($1000)');
+title('Trend Analysis using Linear Regression');
+legend('Actual Sales','Trend Line','Location','best');
+grid on;
+
+%% --- Step 6: Forecast Next 3 Months (Exponential Smoothing + Trend) ---
+next_months = 3;
+forecast_exp = zeros(1,next_months);
+forecast_lin = zeros(1,next_months);
+
+last_value = Sales(end);
+last_trend = trend(end);
+
+for i=1:next_months
+    % Exponential smoothing forecast
+    forecast_exp(i) = alpha*last_value + (1-alpha)*exp_smooth(end);
+    exp_smooth(end+1) = forecast_exp(i); % update for next iteration
+    
+    % Linear regression forecast (simple trend)
+    forecast_lin(i) = mdl.Coefficients.Estimate(1) + mdl.Coefficients.Estimate(2)*(numMonths+i);
+end
+
+nextMonthsNames = {'Next1','Next2','Next3'};
+
+fprintf('Forecasted Sales for next 3 months (Exponential Smoothing): %.2f, %.2f, %.2f ($1000)\n', forecast_exp);
+fprintf('Forecasted Sales for next 3 months (Trend): %.2f, %.2f, %.2f ($1000)\n', forecast_lin);
+
+%% --- Step 7: Plot Forecast Comparison ---
+figure('Name','Next 3 Months Forecast','NumberTitle','off');
+bar([forecast_exp; forecast_lin]','grouped');
+set(gca,'XTickLabel',nextMonthsNames);
+ylabel('Sales ($1000)');
+title('Next 3 Months Sales Forecast Comparison');
+legend('Exp. Smoothing','Linear Trend','Location','best');
+grid on;
+
+%% --- Step 8: Save Final Forecast Plot ---
+saveas(gcf,'next_3months_forecast.png');
